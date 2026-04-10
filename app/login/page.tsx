@@ -45,8 +45,10 @@ try {
   // 🔥 تخزين التوكن
   localStorage.setItem("token", data.access_token)
 
-  // ممكن كمان تخزني بيانات اليوزر
-  localStorage.setItem("user", JSON.stringify(data.user))
+// 👇 مهم جدًا
+localStorage.setItem("user", JSON.stringify({
+  username: formData.username
+}))
 
   // ✅ تحويل للشات
   router.push("/chat")

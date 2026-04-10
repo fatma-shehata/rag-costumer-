@@ -47,9 +47,14 @@ export default function ChatPage() {
 
   // load token + user
   useEffect(() => {
-    setToken(localStorage.getItem("token"))
+    const t = localStorage.getItem("token")
     const u = localStorage.getItem("user")
-    if (u) setUser(JSON.parse(u))
+
+    setToken(t)
+
+    if (u) {
+      setUser(JSON.parse(u))
+    }
   }, [])
 
   // load history
@@ -63,6 +68,8 @@ export default function ChatPage() {
     })
       .then((res) => res.json())
       .then((data) => {
+        console.log("HISTORY:", data)
+
         setChatHistory(
           data.map((c: any) => ({
             id: String(c.id),
@@ -86,7 +93,7 @@ export default function ChatPage() {
     setIsMobileSidebarOpen(false)
   }
 
-  // 🔥 تحميل رسائل الشات
+  // 🔥 تحميل شات كامل
   const handleSelectChat = async (id: string) => {
     setCurrentChatId(id)
     setIsMobileSidebarOpen(false)
@@ -101,6 +108,8 @@ export default function ChatPage() {
       })
 
       const data = await res.json()
+
+      console.log("CHAT DETAILS:", data)
 
       setMessages(
         data.messages.map((m: any) => ({
@@ -144,28 +153,30 @@ export default function ChatPage() {
       })
 
       const data = await res.json()
-      console.log("CHAT RESPONSE:", data)
 
-      // ⚠️ check مهم
-      if (!data.message_id) {
-        console.error("❌ message_id missing from backend")
-      }
+      console.log("FULL RESPONSE:", data)
 
       const botMsg: Message = {
-        id: Number(data.message_id),
-        content: data.answer,
+        id: Date.now() + 1,
+        content:
+          data.answer ||
+          data.response ||
+          "No response from server",
         role: "assistant",
-        sources: data.sources || [],
+        sources:
+          data.sources?.map((s: any) => ({
+            title: s.title || s.category || "Source",
+            url: s.url || "#",
+          })) || [],
         timestamp: new Date().toLocaleTimeString(),
       }
 
       setMessages((prev) => [...prev, botMsg])
 
-      if (!currentChatId) {
+      if (!currentChatId && data.conversation_id) {
         setCurrentChatId(String(data.conversation_id))
       }
 
-      // تحديث الهستوري
       loadHistory()
 
     } catch (err) {
@@ -175,32 +186,12 @@ export default function ChatPage() {
     }
   }
 
-  // ✅ FIXED FEEDBACK
-  const handleFeedback = (messageId: number, feedback: "up" | "down") => {
-    if (!token) return
-
-    const payload = {
-      message_id: messageId,
-      rating: feedback === "up" ? 1 : -1,
-      comment: "", // ✅ مهم حسب API
-    }
-
-    console.log("FEEDBACK PAYLOAD:", payload)
-
-    fetch("http://127.0.0.1:8000/feedback/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    }).catch(console.error)
-  }
+  // 🔥 عطلنا الفيدباك مؤقتًا
+  const handleFeedback = () => {}
 
   return (
     <div className="flex h-screen bg-background">
 
-      {/* Sidebar */}
       <div className="hidden md:block">
         <ChatSidebar
           chatHistory={chatHistory}
@@ -210,33 +201,8 @@ export default function ChatPage() {
         />
       </div>
 
-      {/* Mobile overlay */}
-      {isMobileSidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 md:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
-
-      {/* Mobile sidebar */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 md:hidden transition-transform",
-          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <ChatSidebar
-          chatHistory={chatHistory}
-          onNewChat={handleNewChat}
-          onSelectChat={handleSelectChat}
-          currentChatId={currentChatId}
-        />
-      </div>
-
-      {/* MAIN */}
       <div className="flex-1 flex flex-col">
 
-        {/* Header */}
         <header className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" />
@@ -250,7 +216,6 @@ export default function ChatPage() {
           )}
         </header>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
             <EmptyState onSuggestionClick={handleSendMessage} />
@@ -270,7 +235,6 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Input */}
         <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
       </div>
     </div>
