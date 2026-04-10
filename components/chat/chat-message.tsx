@@ -13,12 +13,12 @@ interface Source {
 }
 
 interface ChatMessageProps {
-  id: string
+  id: number
   content: string
   role: "user" | "assistant"
   sources?: Source[]
   timestamp: string
-  onFeedback?: (messageId: string, feedback: "up" | "down", comment?: string) => void
+  onFeedback?: (messageId: number, feedback: "up" | "down", comment?: string) => void
 }
 
 export function ChatMessage({ id, content, role, sources, timestamp, onFeedback }: ChatMessageProps) {
