@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/chat/empty-state"
 import { cn } from "@/lib/utils"
 
 interface Message {
-  id: string
+  id: number
   content: string
   role: "user" | "assistant"
   sources?: any[]
@@ -36,6 +36,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const [token, setToken] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -44,13 +45,15 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isLoading])
 
-  // load token
+  // load token + user
   useEffect(() => {
     setToken(localStorage.getItem("token"))
+    const u = localStorage.getItem("user")
+    if (u) setUser(JSON.parse(u))
   }, [])
 
   // load history
-  useEffect(() => {
+  const loadHistory = () => {
     if (!token) return
 
     fetch("http://127.0.0.1:8000/chat/history", {
@@ -71,6 +74,10 @@ export default function ChatPage() {
         )
       })
       .catch(console.error)
+  }
+
+  useEffect(() => {
+    if (token) loadHistory()
   }, [token])
 
   const handleNewChat = () => {
@@ -79,17 +86,41 @@ export default function ChatPage() {
     setIsMobileSidebarOpen(false)
   }
 
-  const handleSelectChat = (id: string) => {
+  // 🔥 تحميل رسائل الشات
+  const handleSelectChat = async (id: string) => {
     setCurrentChatId(id)
-    setMessages([])
     setIsMobileSidebarOpen(false)
+
+    if (!token) return
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/chat/history/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await res.json()
+
+      setMessages(
+        data.messages.map((m: any) => ({
+          id: Number(m.id),
+          content: m.content,
+          role: m.role,
+          sources: m.sources || [],
+          timestamp: new Date(m.created_at).toLocaleTimeString(),
+        }))
+      )
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   const handleSendMessage = async (content: string) => {
     if (!token) return
 
     const userMsg: Message = {
-      id: `u-${Date.now()}`,
+      id: Date.now(),
       content,
       role: "user",
       timestamp: new Date().toLocaleTimeString(),
@@ -113,10 +144,15 @@ export default function ChatPage() {
       })
 
       const data = await res.json()
-      console.log("RESPONSE:", data)
+      console.log("CHAT RESPONSE:", data)
+
+      // ⚠️ check مهم
+      if (!data.message_id) {
+        console.error("❌ message_id missing from backend")
+      }
 
       const botMsg: Message = {
-        id: `a-${Date.now()}`,
+        id: Number(data.message_id),
         content: data.answer,
         role: "assistant",
         sources: data.sources || [],
@@ -128,6 +164,10 @@ export default function ChatPage() {
       if (!currentChatId) {
         setCurrentChatId(String(data.conversation_id))
       }
+
+      // تحديث الهستوري
+      loadHistory()
+
     } catch (err) {
       console.error(err)
     } finally {
@@ -135,8 +175,17 @@ export default function ChatPage() {
     }
   }
 
-  const handleFeedback = (messageId: string, feedback: "up" | "down") => {
+  // ✅ FIXED FEEDBACK
+  const handleFeedback = (messageId: number, feedback: "up" | "down") => {
     if (!token) return
+
+    const payload = {
+      message_id: messageId,
+      rating: feedback === "up" ? 1 : -1,
+      comment: "", // ✅ مهم حسب API
+    }
+
+    console.log("FEEDBACK PAYLOAD:", payload)
 
     fetch("http://127.0.0.1:8000/feedback/", {
       method: "POST",
@@ -144,10 +193,7 @@ export default function ChatPage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        message_id: messageId,
-        rating: feedback === "up" ? 5 : 1,
-      }),
+      body: JSON.stringify(payload),
     }).catch(console.error)
   }
 
@@ -191,20 +237,17 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col">
 
         {/* Header */}
-        <header className="flex items-center gap-3 p-3 border-b">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          >
-            {isMobileSidebarOpen ? <X /> : <Menu />}
-          </Button>
-
+        <header className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" />
             <span className="font-semibold">BrownBox AI</span>
           </div>
+
+          {user && (
+            <div className="text-sm text-muted-foreground">
+              {user.username}
+            </div>
+          )}
         </header>
 
         {/* Messages */}
@@ -222,7 +265,6 @@ export default function ChatPage() {
               ))}
 
               {isLoading && <TypingIndicator />}
-
               <div ref={messagesEndRef} />
             </div>
           )}
