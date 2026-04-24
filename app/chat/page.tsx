@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { Package } from "lucide-react"
+import { Package, Mic, MicOff } from "lucide-react"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { ChatMessage } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/chat/empty-state"
 import { useAuth } from "@/hooks/useAuth"
 import { useChat } from "@/hooks/useChat"
 import { useFeedback } from "@/hooks/useFeedback"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export default function ChatPage() {
   const { user } = useAuth()
@@ -18,16 +20,18 @@ export default function ChatPage() {
     conversations,
     currentConversationId,
     isLoading,
+    isRecording,
     error,
     messagesEndRef,
     loadHistory,
     selectConversation,
     newChat,
     sendMessage,
+    startRecording,
+    stopRecording,
   } = useChat()
   const { submit: submitFeedback } = useFeedback()
 
-  // load sidebar history on mount
   useEffect(() => {
     loadHistory()
   }, [loadHistory])
@@ -38,7 +42,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar — desktop only */}
+      {/* Sidebar */}
       <div className="hidden md:block">
         <ChatSidebar
           chatHistory={conversations.map((c) => ({
@@ -54,16 +58,30 @@ export default function ChatPage() {
         />
       </div>
 
-      {/* Main panel */}
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center justify-between p-3 border-b shrink-0">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" />
             <span className="font-semibold">BrownBox AI</span>
           </div>
-          {user && (
-            <span className="text-sm text-muted-foreground">{user.username}</span>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Voice button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isLoading}
+              title={isRecording ? "Stop recording" : "Voice message"}
+              className={cn(isRecording && "text-red-500 animate-pulse")}
+            >
+              {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </Button>
+
+            {user && (
+              <span className="text-sm text-muted-foreground">{user.username}</span>
+            )}
+          </div>
         </header>
 
         {/* Messages */}
@@ -80,6 +98,11 @@ export default function ChatPage() {
                 />
               ))}
               {isLoading && <TypingIndicator />}
+              {isRecording && (
+                <p className="text-sm text-red-500 text-center py-2 animate-pulse">
+                  🎙️ Recording... tap the mic again to send
+                </p>
+              )}
               {error && (
                 <p className="text-sm text-red-500 text-center py-2">{error}</p>
               )}

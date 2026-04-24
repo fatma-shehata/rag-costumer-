@@ -19,28 +19,28 @@ export function useAuth() {
     error: null,
   })
 
-  // ── Rehydrate user from localStorage on mount ──
+  // Rehydrate user — always fetch from /auth/me if token exists
   useEffect(() => {
-    const stored = localStorage.getItem("user")
-    if (stored) {
-      try {
-        setState((prev) => ({ ...prev, user: JSON.parse(stored) }))
-      } catch {
-        localStorage.removeItem("user")
-      }
-    }
-  }, [])
+    const token = localStorage.getItem("token")
+    if (!token) return
+
+    authService.getMe()
+      .then((user) => setState((prev) => ({ ...prev, user })))
+      .catch(() => {
+        // token expired or invalid — clear and redirect
+        authService.logout()
+        router.push("/login")
+      })
+  }, [router])
 
   const setError = (error: string | null) =>
     setState((prev) => ({ ...prev, error }))
 
-  // ── Login ──────────────────────────────────────
   const login = useCallback(
     async (payload: LoginRequest) => {
       setState((prev) => ({ ...prev, isLoading: true, error: null }))
       try {
         await authService.login(payload)
-        // fetch full user object so we persist real data (id, email, etc.)
         const user = await authService.getMe()
         setState({ user, isLoading: false, error: null })
         router.push("/chat")
@@ -52,13 +52,12 @@ export function useAuth() {
     [router]
   )
 
-  // ── Register ───────────────────────────────────
   const register = useCallback(async (payload: RegisterRequest) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }))
     try {
       await authService.register(payload)
       setState((prev) => ({ ...prev, isLoading: false }))
-      return true // caller can redirect after showing success msg
+      return true
     } catch (err: any) {
       const msg = err.response?.data?.detail ?? err.message ?? "Registration failed"
       setState((prev) => ({ ...prev, isLoading: false, error: msg }))
@@ -66,7 +65,6 @@ export function useAuth() {
     }
   }, [])
 
-  // ── Logout ─────────────────────────────────────
   const logout = useCallback(() => {
     authService.logout()
     setState({ user: null, isLoading: false, error: null })
