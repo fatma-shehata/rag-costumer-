@@ -9,62 +9,28 @@ import type {
   UIConversation,
 } from "@/types"
 
-// ─── Raw API calls ────────────────────────────────────────────────────────────
-
 export const chatService = {
-  /**
-   * POST /chat/ask
-   * Send a text question and get an AI answer.
-   */
   ask: async (payload: ChatRequest): Promise<ChatResponse> => {
-    const { data } = await apiClient.post<ChatResponse>("/chat/ask", payload)
-    return data
+    return (await apiClient.post<ChatResponse>("/chat/ask", payload)).data
   },
 
-  /**
-   * POST /chat/voice
-   * Send an audio file and get an AI answer (multipart/form-data).
-   */
-  voiceQuery: async ({
-    audio,
-    conversation_id,
-    n_results,
-  }: VoiceQueryParams): Promise<ChatResponse> => {
+  voiceQuery: async ({ audio, conversation_id, n_results }: VoiceQueryParams): Promise<ChatResponse> => {
     const form = new FormData()
     form.append("audio", audio)
     if (conversation_id !== undefined) form.append("conversation_id", String(conversation_id))
     if (n_results !== undefined) form.append("n_results", String(n_results))
-
-    const { data } = await apiClient.post<ChatResponse>("/chat/voice", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })
-    return data
+    return (await apiClient.post<ChatResponse>("/chat/voice", form)).data
   },
 
-  /**
-   * GET /chat/history
-   * List all conversations for the current user.
-   */
   getHistory: async (): Promise<ConversationListItem[]> => {
-    const { data } = await apiClient.get<ConversationListItem[]>("/chat/history")
-    return data
+    return (await apiClient.get<ConversationListItem[]>("/chat/history")).data
   },
 
-  /**
-   * GET /chat/history/:id
-   * Get full conversation with all messages.
-   */
   getConversation: async (id: number): Promise<ConversationDetail> => {
-    const { data } = await apiClient.get<ConversationDetail>(`/chat/history/${id}`)
-    return data
+    return (await apiClient.get<ConversationDetail>(`/chat/history/${id}`)).data
   },
 }
 
-// ─── UI normalizers (raw API → UI shapes) ─────────────────────────────────────
-
-/**
- * Converts a raw ChatResponse into a UIMessage for the assistant bubble.
- */
 export function normalizeAssistantMessage(raw: ChatResponse): UIMessage {
   return {
     id: raw.message_id ?? Date.now(),
@@ -78,12 +44,7 @@ export function normalizeAssistantMessage(raw: ChatResponse): UIMessage {
   }
 }
 
-/**
- * Converts ConversationListItem[] → UIConversation[] for the sidebar.
- */
-export function normalizeConversationList(
-  raw: ConversationListItem[]
-): UIConversation[] {
+export function normalizeConversationList(raw: ConversationListItem[]): UIConversation[] {
   return raw.map((c) => ({
     id: String(c.id),
     title: c.title,
@@ -91,13 +52,7 @@ export function normalizeConversationList(
   }))
 }
 
-/**
- * Converts a ConversationDetail's messages → UIMessage[] for the chat window.
- * The API stores user query + LLM response as one row, so we expand each to 2 bubbles.
- */
-export function normalizeConversationMessages(
-  detail: ConversationDetail
-): UIMessage[] {
+export function normalizeConversationMessages(detail: ConversationDetail): UIMessage[] {
   return detail.messages.flatMap((m) => [
     {
       id: m.id * 10,
