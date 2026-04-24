@@ -1,241 +1,94 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Package, Menu, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect } from "react"
+import { Package } from "lucide-react"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { ChatMessage } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
 import { TypingIndicator } from "@/components/chat/typing-indicator"
 import { EmptyState } from "@/components/chat/empty-state"
-import { cn } from "@/lib/utils"
-
-interface Message {
-  id: number
-  content: string
-  role: "user" | "assistant"
-  sources?: any[]
-  timestamp: string
-}
-
-interface ChatHistory {
-  id: string
-  title: string
-  timestamp: string
-  isActive: boolean
-  messages: Message[]
-}
+import { useAuth } from "@/hooks/useAuth"
+import { useChat } from "@/hooks/useChat"
+import { useFeedback } from "@/hooks/useFeedback"
 
 export default function ChatPage() {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const { user } = useAuth()
+  const {
+    messages,
+    conversations,
+    currentConversationId,
+    isLoading,
+    error,
+    messagesEndRef,
+    loadHistory,
+    selectConversation,
+    newChat,
+    sendMessage,
+  } = useChat()
+  const { submit: submitFeedback } = useFeedback()
 
-  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([])
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-
-  const [token, setToken] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // scroll
+  // load sidebar history on mount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isLoading])
+    loadHistory()
+  }, [loadHistory])
 
-  // load token + user
-  useEffect(() => {
-    const t = localStorage.getItem("token")
-    const u = localStorage.getItem("user")
-
-    setToken(t)
-
-    if (u) {
-      setUser(JSON.parse(u))
-    }
-  }, [])
-
-  // load history
-  const loadHistory = () => {
-    if (!token) return
-
-    fetch("http://127.0.0.1:8000/chat/history", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("HISTORY:", data)
-
-        setChatHistory(
-          data.map((c: any) => ({
-            id: String(c.id),
-            title: c.title,
-            timestamp: c.created_at,
-            isActive: false,
-            messages: [],
-          }))
-        )
-      })
-      .catch(console.error)
+  const handleFeedback = async (messageId: number, rating: number) => {
+    await submitFeedback(messageId, rating)
   }
-
-  useEffect(() => {
-    if (token) loadHistory()
-  }, [token])
-
-  const handleNewChat = () => {
-    setCurrentChatId(null)
-    setMessages([])
-    setIsMobileSidebarOpen(false)
-  }
-
-  // 🔥 تحميل شات كامل
-  const handleSelectChat = async (id: string) => {
-    setCurrentChatId(id)
-    setIsMobileSidebarOpen(false)
-
-    if (!token) return
-
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/chat/history/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const data = await res.json()
-
-      console.log("CHAT DETAILS:", data)
-
-      setMessages(
-        data.messages.map((m: any) => ({
-          id: Number(m.id),
-          content: m.content,
-          role: m.role,
-          sources: m.sources || [],
-          timestamp: new Date(m.created_at).toLocaleTimeString(),
-        }))
-      )
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const handleSendMessage = async (content: string) => {
-    if (!token) return
-
-    const userMsg: Message = {
-      id: Date.now(),
-      content,
-      role: "user",
-      timestamp: new Date().toLocaleTimeString(),
-    }
-
-    setMessages((prev) => [...prev, userMsg])
-    setIsLoading(true)
-
-    try {
-      const res = await fetch("http://127.0.0.1:8000/chat/ask", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          question: content,
-          conversation_id: currentChatId ? Number(currentChatId) : 0,
-          n_results: 3,
-        }),
-      })
-
-      const data = await res.json()
-
-      console.log("FULL RESPONSE:", data)
-
-      const botMsg: Message = {
-        id: Date.now() + 1,
-        content:
-          data.answer ||
-          data.response ||
-          "No response from server",
-        role: "assistant",
-        sources:
-          data.sources?.map((s: any) => ({
-            title: s.title || s.category || "Source",
-            url: s.url || "#",
-          })) || [],
-        timestamp: new Date().toLocaleTimeString(),
-      }
-
-      setMessages((prev) => [...prev, botMsg])
-
-      if (!currentChatId && data.conversation_id) {
-        setCurrentChatId(String(data.conversation_id))
-      }
-
-      loadHistory()
-
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // 🔥 عطلنا الفيدباك مؤقتًا
-  const handleFeedback = () => {}
 
   return (
     <div className="flex h-screen bg-background">
-
+      {/* Sidebar — desktop only */}
       <div className="hidden md:block">
         <ChatSidebar
-          chatHistory={chatHistory}
-          onNewChat={handleNewChat}
-          onSelectChat={handleSelectChat}
-          currentChatId={currentChatId}
+          chatHistory={conversations.map((c) => ({
+            id: c.id,
+            title: c.title,
+            timestamp: c.timestamp,
+            isActive: c.id === String(currentConversationId),
+            messages: [],
+          }))}
+          onNewChat={newChat}
+          onSelectChat={selectConversation}
+          currentChatId={currentConversationId ? String(currentConversationId) : null}
         />
       </div>
 
-      <div className="flex-1 flex flex-col">
-
-        <header className="flex items-center justify-between p-3 border-b">
+      {/* Main panel */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="flex items-center justify-between p-3 border-b shrink-0">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" />
             <span className="font-semibold">BrownBox AI</span>
           </div>
-
           {user && (
-            <div className="text-sm text-muted-foreground">
-              {user.username}
-            </div>
+            <span className="text-sm text-muted-foreground">{user.username}</span>
           )}
         </header>
 
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 ? (
-            <EmptyState onSuggestionClick={handleSendMessage} />
+            <EmptyState onSuggestionClick={sendMessage} />
           ) : (
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto px-4 pb-4">
               {messages.map((m) => (
                 <ChatMessage
                   key={m.id}
                   {...m}
-                  onFeedback={handleFeedback}
+                  onFeedback={(rating: number) => handleFeedback(m.id, rating)}
                 />
               ))}
-
               {isLoading && <TypingIndicator />}
+              {error && (
+                <p className="text-sm text-red-500 text-center py-2">{error}</p>
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
-        <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
+        <ChatInput onSend={sendMessage} isLoading={isLoading} />
       </div>
     </div>
   )
