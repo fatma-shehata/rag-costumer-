@@ -4,12 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import {
   chatService,
   normalizeAssistantMessage,
-  normalizeConversationList,
   normalizeConversationMessages,
 } from "@/services/chat.service"
 import type { UIMessage, UIConversation } from "@/types"
 
-// Format ISO date → "Apr 25, 2:39 AM"
 function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
     month: "short",
@@ -18,6 +16,10 @@ function formatTimestamp(iso: string): string {
     minute: "2-digit",
     hour12: true,
   })
+}
+
+function now(): string {
+  return new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
 }
 
 export function useChat() {
@@ -37,9 +39,13 @@ export function useChat() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const raw = await chatService.getHistory()
+      const res = await chatService.getHistory()
+      // backend may return array or wrapped object
+      const raw: any[] = Array.isArray(res)
+        ? res
+        : (res as any)?.conversations ?? (res as any)?.data ?? []
       setConversations(
-        raw.map((c) => ({
+        raw.map((c: any) => ({
           id: String(c.id),
           title: c.title,
           timestamp: formatTimestamp(c.created_at),
@@ -51,15 +57,13 @@ export function useChat() {
   }, [])
 
   const selectConversation = useCallback(async (id: string) => {
-    const numId = Number(id)
-    setCurrentConversationId(numId)
+    setCurrentConversationId(Number(id))
     setError(null)
     try {
-      const detail = await chatService.getConversation(numId)
+      const detail = await chatService.getConversation(Number(id))
       setMessages(normalizeConversationMessages(detail))
-    } catch (err) {
+    } catch {
       setError("Failed to load conversation")
-      console.error("[useChat] selectConversation:", err)
     }
   }, [])
 
@@ -71,16 +75,12 @@ export function useChat() {
 
   const sendMessage = useCallback(
     async (content: string) => {
-      const userMsg: UIMessage = {
-        id: Date.now(),
-        content,
-        role: "user",
-        timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }),
-      }
-      setMessages((prev) => [...prev, userMsg])
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now(), content, role: "user", timestamp: now() },
+      ])
       setIsLoading(true)
       setError(null)
-
       try {
         const response = await chatService.ask({
           question: content,
@@ -93,7 +93,7 @@ export function useChat() {
         }
         await loadHistory()
       } catch (err: any) {
-        setError(err.message ?? "Something went wrong. Please try again.")
+        setError(err.message ?? "Something went wrong.")
       } finally {
         setIsLoading(false)
       }
@@ -101,7 +101,39 @@ export function useChat() {
     [currentConversationId, loadHistory]
   )
 
-  // ── Voice recording ────────────────────────────────────────────────────────
+  const sendVoiceFile = useCallback(
+    async (audio: File) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now(), content: "🎙️ Voice message", role: "user", timestamp: now() },
+      ])
+      setIsLoading(true)
+      setError(null)
+      try {
+        const text = await chatService.voiceQuery({
+          audio,
+          conversation_id: currentConversationId ?? undefined,
+          n_results: 3,
+        })
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            content: typeof text === "string" ? text : "No response from server",
+            role: "assistant",
+            timestamp: now(),
+          },
+        ])
+        await loadHistory()
+      } catch {
+        setError("Voice query failed. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [currentConversationId, loadHistory]
+  )
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -112,7 +144,6 @@ export function useChat() {
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
-
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" })
         const audioFile = new File([audioBlob], "voice.webm", { type: "audio/webm" })
@@ -123,38 +154,14 @@ export function useChat() {
       mediaRecorder.start()
       setIsRecording(true)
     } catch {
-      setError("Microphone access denied. Please allow microphone permission.")
+      setError("Microphone access denied.")
     }
-  }, [])
+  }, [sendVoiceFile])
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop()
     setIsRecording(false)
   }, [])
-
-  const sendVoiceFile = useCallback(
-    async (audio: File) => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await chatService.voiceQuery({
-          audio,
-          conversation_id: currentConversationId ?? undefined,
-          n_results: 3,
-        })
-        setMessages((prev) => [...prev, normalizeAssistantMessage(response)])
-        if (!currentConversationId && response.conversation_id) {
-          setCurrentConversationId(response.conversation_id)
-        }
-        await loadHistory()
-      } catch (err: any) {
-        setError("Voice query failed. Please try again.")
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [currentConversationId, loadHistory]
-  )
 
   return {
     messages,

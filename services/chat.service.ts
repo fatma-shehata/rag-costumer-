@@ -11,23 +11,28 @@ import type {
 
 export const chatService = {
   ask: async (payload: ChatRequest): Promise<ChatResponse> => {
-    return (await apiClient.post<ChatResponse>("/chat/ask", payload)).data
+    const response = await apiClient.post<ChatResponse>("/chat/ask", payload)
+    return response.data
   },
 
-  voiceQuery: async ({ audio, conversation_id, n_results }: VoiceQueryParams): Promise<ChatResponse> => {
+  voiceQuery: async ({ audio, conversation_id, n_results }: VoiceQueryParams): Promise<string> => {
     const form = new FormData()
     form.append("audio", audio)
     if (conversation_id !== undefined) form.append("conversation_id", String(conversation_id))
     if (n_results !== undefined) form.append("n_results", String(n_results))
-    return (await apiClient.post<ChatResponse>("/chat/voice", form)).data
+
+    const response = await apiClient.post<string>("/chat/voice", form)
+    return response.data
   },
 
   getHistory: async (): Promise<ConversationListItem[]> => {
-    return (await apiClient.get<ConversationListItem[]>("/chat/history")).data
+    const response = await apiClient.get<ConversationListItem[]>("/chat/history")
+    return response.data
   },
 
   getConversation: async (id: number): Promise<ConversationDetail> => {
-    return (await apiClient.get<ConversationDetail>(`/chat/history/${id}`)).data
+    const response = await apiClient.get<ConversationDetail>(`/chat/history/${id}`)
+    return response.data
   },
 }
 
