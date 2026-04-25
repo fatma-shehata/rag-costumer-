@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { Package, Plus, MessageSquare, LogOut, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
 
@@ -15,14 +14,37 @@ interface ChatHistory {
   isActive: boolean
 }
 
+interface User {
+  id?: number
+  username: string
+  email?: string
+}
+
 interface ChatSidebarProps {
   chatHistory: ChatHistory[]
   onNewChat: () => void
   onSelectChat: (id: string) => void
   currentChatId: string | null
+  user?: User | null
+  onLogout?: () => void
 }
 
-export function ChatSidebar({ chatHistory, onNewChat, onSelectChat, currentChatId }: ChatSidebarProps) {
+function getInitials(username: string): string {
+  return username
+    .split(/[\s_-]/)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .slice(0, 2)
+    .join("")
+}
+
+export function ChatSidebar({
+  chatHistory,
+  onNewChat,
+  onSelectChat,
+  currentChatId,
+  user,
+  onLogout,
+}: ChatSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   return (
@@ -52,23 +74,28 @@ export function ChatSidebar({ chatHistory, onNewChat, onSelectChat, currentChatI
         </Button>
       </div>
 
-      {/* User Profile */}
-      <div className={cn("p-4 border-b border-sidebar-border", isCollapsed && "flex justify-center")}>
-        <div className={cn("flex items-center gap-3", isCollapsed && "flex-col")}>
-          <Avatar className="h-10 w-10">
-            <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground">JD</AvatarFallback>
-          </Avatar>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">John Doe</p>
-              <p className="text-xs text-muted-foreground truncate">john@example.com</p>
-            </div>
-          )}
+      {/* User Profile — real data from API */}
+      {user && (
+        <div className={cn("p-4 border-b border-sidebar-border", isCollapsed && "flex justify-center")}>
+          <div className={cn("flex items-center gap-3", isCollapsed && "flex-col")}>
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+                {getInitials(user.username)}
+              </AvatarFallback>
+            </Avatar>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">{user.username}</p>
+                {user.email && (
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* New Chat Button */}
+      {/* New Chat */}
       <div className="p-3">
         <Button
           onClick={onNewChat}
@@ -115,18 +142,22 @@ export function ChatSidebar({ chatHistory, onNewChat, onSelectChat, currentChatI
       </div>
 
       {/* Footer */}
-      <div className={cn("p-3 border-t border-sidebar-border", isCollapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between")}>
+      <div
+        className={cn(
+          "p-3 border-t border-sidebar-border",
+          isCollapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between"
+        )}
+      >
         <ThemeToggle />
-        <Link href="/login">
-          <Button
-            variant="ghost"
-            size={isCollapsed ? "icon" : "sm"}
-            className="text-sidebar-foreground hover:bg-sidebar-accent gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            {!isCollapsed && "Logout"}
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          size={isCollapsed ? "icon" : "sm"}
+          onClick={onLogout}
+          className="text-sidebar-foreground hover:bg-sidebar-accent gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          {!isCollapsed && "Logout"}
+        </Button>
       </div>
     </aside>
   )

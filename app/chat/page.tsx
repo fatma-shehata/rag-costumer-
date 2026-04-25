@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { Package, Mic, MicOff } from "lucide-react"
+import { Package } from "lucide-react"
 import { ChatSidebar } from "@/components/chat/chat-sidebar"
 import { ChatMessage } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
@@ -10,11 +10,9 @@ import { EmptyState } from "@/components/chat/empty-state"
 import { useAuth } from "@/hooks/useAuth"
 import { useChat } from "@/hooks/useChat"
 import { useFeedback } from "@/hooks/useFeedback"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 
 export default function ChatPage() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const {
     messages,
     conversations,
@@ -36,13 +34,9 @@ export default function ChatPage() {
     loadHistory()
   }, [loadHistory])
 
-  const handleFeedback = async (messageId: number, rating: number) => {
-    await submitFeedback(messageId, rating)
-  }
-
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar */}
+      {/* Sidebar — receives real user from /auth/me */}
       <div className="hidden md:block">
         <ChatSidebar
           chatHistory={conversations.map((c) => ({
@@ -55,6 +49,8 @@ export default function ChatPage() {
           onNewChat={newChat}
           onSelectChat={selectConversation}
           currentChatId={currentConversationId ? String(currentConversationId) : null}
+          user={user}
+          onLogout={logout}
         />
       </div>
 
@@ -64,23 +60,6 @@ export default function ChatPage() {
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5" />
             <span className="font-semibold">BrownBox AI</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Voice button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isLoading}
-              title={isRecording ? "Stop recording" : "Voice message"}
-              className={cn(isRecording && "text-red-500 animate-pulse")}
-            >
-              {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </Button>
-
-            {user && (
-              <span className="text-sm text-muted-foreground">{user.username}</span>
-            )}
           </div>
         </header>
 
@@ -94,7 +73,7 @@ export default function ChatPage() {
                 <ChatMessage
                   key={m.id}
                   {...m}
-                  onFeedback={(rating: number) => handleFeedback(m.id, rating)}
+                  onFeedback={(rating: number) => submitFeedback(m.id, rating)}
                 />
               ))}
               {isLoading && <TypingIndicator />}
@@ -111,7 +90,14 @@ export default function ChatPage() {
           )}
         </div>
 
-        <ChatInput onSend={sendMessage} isLoading={isLoading} />
+        {/* Input with voice button inside — ChatGPT style */}
+        <ChatInput
+          onSend={sendMessage}
+          isLoading={isLoading}
+          isRecording={isRecording}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
+        />
       </div>
     </div>
   )
