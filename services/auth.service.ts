@@ -42,10 +42,10 @@ export const authService = {
     await apiClient.post("/auth/reset-password", payload)
   },
 
-  googleLogin: (): void => {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
-    window.location.href = `${base}/auth/google/login`
-  },
+ googleLogin: (): void => {
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
+  window.location.href = `${base}/auth/google/login`
+},
 
   logout: (): void => {
     localStorage.removeItem("token")
