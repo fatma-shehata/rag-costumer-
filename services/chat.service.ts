@@ -15,13 +15,17 @@ export const chatService = {
     return response.data
   },
 
-  voiceQuery: async ({ audio, conversation_id, n_results }: VoiceQueryParams): Promise<string> => {
+voiceQuery: async ({ audio, conversation_id, n_results }: VoiceQueryParams): Promise<any> => {
     const form = new FormData()
     form.append("audio", audio)
     if (conversation_id !== undefined) form.append("conversation_id", String(conversation_id))
     if (n_results !== undefined) form.append("n_results", String(n_results))
 
-    const response = await apiClient.post<string>("/chat/voice", form)
+    const response = await apiClient.post("/chat/voice", form, {
+      headers: {
+        "Content-Type": "multipart/form-data",  
+      },
+    })
     return response.data
   },
 
