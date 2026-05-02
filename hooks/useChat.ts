@@ -101,38 +101,47 @@ export function useChat() {
     [currentConversationId, loadHistory]
   )
 
-  const sendVoiceFile = useCallback(
-    async (audio: File) => {
+const sendVoiceFile = useCallback(
+  async (audio: File) => {
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now(), content: "🎙️ Voice message", role: "user", timestamp: now() },
+    ])
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await chatService.voiceQuery({
+        audio,
+        conversation_id: currentConversationId ?? undefined,
+        n_results: 3,
+      })
+
+      const data = response as any
+      
       setMessages((prev) => [
-        ...prev,
-        { id: Date.now(), content: "🎙️ Voice message", role: "user", timestamp: now() },
+        ...prev.slice(0, -1),
+        { id: Date.now(), content: `🎙️ ${data.transcription}`, role: "user", timestamp: now() },
+        {
+          id: Date.now() + 1,
+          content: data.answer ?? "No response from server",
+          role: "assistant",
+          timestamp: now(),
+        },
       ])
-      setIsLoading(true)
-      setError(null)
-      try {
-        const text = await chatService.voiceQuery({
-          audio,
-          conversation_id: currentConversationId ?? undefined,
-          n_results: 3,
-        })
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now() + 1,
-            content: typeof text === "string" ? text : "No response from server",
-            role: "assistant",
-            timestamp: now(),
-          },
-        ])
-        await loadHistory()
-      } catch {
-        setError("Voice query failed. Please try again.")
-      } finally {
-        setIsLoading(false)
+
+      if (!currentConversationId && data.conversation_id) {
+        setCurrentConversationId(data.conversation_id)
       }
-    },
-    [currentConversationId, loadHistory]
-  )
+
+      await loadHistory()
+    } catch {
+      setError("Voice query failed. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  },
+  [currentConversationId, loadHistory]
+)
 
   const startRecording = useCallback(async () => {
     try {
