@@ -117,7 +117,7 @@ const sendVoiceFile = useCallback(
       })
 
       const data = response as any
-      
+
       setMessages((prev) => [
         ...prev.slice(0, -1),
         { id: Date.now(), content: `🎙️ ${data.transcription}`, role: "user", timestamp: now() },
@@ -128,6 +128,12 @@ const sendVoiceFile = useCallback(
           timestamp: now(),
         },
       ])
+
+      if (data.audio_base64) {
+        const audioData = `data:audio/mp3;base64,${data.audio_base64}`
+        const audioEl = new Audio(audioData)
+        audioEl.play()
+      }
 
       if (!currentConversationId && data.conversation_id) {
         setCurrentConversationId(data.conversation_id)
