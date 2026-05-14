@@ -122,7 +122,7 @@ const sendVoiceFile = useCallback(
         ...prev.slice(0, -1),
         { id: Date.now(), content: `🎙️ ${data.transcription}`, role: "user", timestamp: now() },
         {
-          id: Date.now() + 1,
+          id: data.message_id,
           content: data.answer ?? "No response from server",
           role: "assistant",
           timestamp: now(),

@@ -73,7 +73,10 @@ export default function ChatPage() {
                 <ChatMessage
                   key={m.id}
                   {...m}
-                  onFeedback={(rating: number) => submitFeedback(m.id, rating)}
+                  onFeedback={(msgId, type, comment) => {
+                    const numericRating = type === "up" ? 1 : -1;
+                    submitFeedback(m.id, numericRating, comment);
+                  }}
                 />
               ))}
               {isLoading && <TypingIndicator />}

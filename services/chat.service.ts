@@ -64,13 +64,13 @@ export function normalizeConversationList(raw: ConversationListItem[]): UIConver
 export function normalizeConversationMessages(detail: ConversationDetail): UIMessage[] {
   return detail.messages.flatMap((m) => [
     {
-      id: m.id * 10,
+      id: -m.id,
       content: m.user_query,
       role: "user" as const,
       timestamp: new Date(m.created_at).toLocaleTimeString(),
     },
     {
-      id: m.id * 10 + 1,
+      id: m.id,
       content: m.llm_response,
       role: "assistant" as const,
       timestamp: new Date(m.created_at).toLocaleTimeString(),
